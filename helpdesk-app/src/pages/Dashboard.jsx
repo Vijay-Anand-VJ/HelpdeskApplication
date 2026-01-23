@@ -20,7 +20,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/tickets/stats", {
+        const response = await fetch("https://helpdesk-yida.onrender.com/api/tickets/stats", {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         const data = await response.json();

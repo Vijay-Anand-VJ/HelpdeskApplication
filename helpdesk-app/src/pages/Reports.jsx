@@ -14,7 +14,7 @@ export default function Reports() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/tickets/stats", {
+        const res = await fetch("https://helpdesk-yida.onrender.com/api/tickets/stats", {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         const result = await res.json();

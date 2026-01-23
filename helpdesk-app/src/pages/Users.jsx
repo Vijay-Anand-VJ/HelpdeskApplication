@@ -14,7 +14,7 @@ export default function Users() {
   // 1. Fetch Users
   const fetchUsers = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/users/users", { // Points to router.route('/users')
+      const res = await fetch("https://helpdesk-yida.onrender.com/api/users/users", { // Points to router.route('/users')
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const data = await res.json();
@@ -34,7 +34,7 @@ export default function Users() {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://localhost:5000/api/users/users", {
+      const res = await fetch("https://helpdesk-yida.onrender.com/api/users/users", {
         method: "POST",
         headers: {
            "Content-Type": "application/json",

@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
   // 2. LOGIN FUNCTION (Calls Backend API)
   const login = async (email, password) => {
     try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const response = await fetch("https://helpdesk-yida.onrender.com/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
   // 4. REGISTER FUNCTION (For Module 11)
   const register = async (name, email, password) => {
     try {
-      const response = await fetch("http://localhost:5000/api/auth/register", {
+      const response = await fetch("https://helpdesk-yida.onrender.com/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),

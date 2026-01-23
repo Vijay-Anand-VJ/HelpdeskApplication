@@ -22,11 +22,11 @@ export default function TicketDetail() {
         const token = user.token;
         const headers = { Authorization: `Bearer ${token}` };
 
-        const ticketRes = await fetch(`http://localhost:5000/api/tickets/${id}`, { headers });
+        const ticketRes = await fetch(`https://helpdesk-yida.onrender.com/api/tickets/${id}`, { headers });
         const ticketData = await ticketRes.json();
         if (!ticketRes.ok) throw new Error(ticketData.message);
 
-        const notesRes = await fetch(`http://localhost:5000/api/tickets/${id}/notes`, { headers });
+        const notesRes = await fetch(`https://helpdesk-yida.onrender.com/api/tickets/${id}/notes`, { headers });
         const notesData = await notesRes.json();
 
         setTicket(ticketData);
@@ -47,7 +47,7 @@ export default function TicketDetail() {
     if (!noteText.trim()) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/tickets/${id}/notes`, {
+      const response = await fetch(`https://helpdesk-yida.onrender.com/api/tickets/${id}/notes`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -70,7 +70,7 @@ export default function TicketDetail() {
   const closeTicket = async () => {
     if(!window.confirm("Are you sure you want to close this ticket?")) return;
     try {
-      await fetch(`http://localhost:5000/api/tickets/${id}`, {
+      await fetch(`https://helpdesk-yida.onrender.com/api/tickets/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -145,7 +145,7 @@ export default function TicketDetail() {
                <div className="flex flex-col items-start gap-3">
                  {/* View Button */}
                  <a 
-                   href={`http://localhost:5000/${ticket.attachment}`} 
+                   href={`https://helpdesk-yida.onrender.com/${ticket.attachment}`} 
                    target="_blank" 
                    rel="noopener noreferrer"
                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-blue-600 text-sm font-medium bg-gray-50"
@@ -157,7 +157,7 @@ export default function TicketDetail() {
                  {ticket.attachment.match(/\.(jpg|jpeg|png|gif)$/i) && (
                    <div className="relative group">
                      <img 
-                       src={`http://localhost:5000/${ticket.attachment}`} 
+                       src={`https://helpdesk-yida.onrender.com/${ticket.attachment}`} 
                        alt="Ticket Attachment" 
                        className="max-w-md w-full rounded-lg border border-gray-200 shadow-sm transition-transform hover:scale-[1.01]"
                      />

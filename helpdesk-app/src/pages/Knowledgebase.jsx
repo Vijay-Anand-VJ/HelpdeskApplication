@@ -15,7 +15,7 @@ export default function KnowledgeBase() {
   // 1. Fetch Articles
   const fetchArticles = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/articles", {
+      const res = await fetch("hhttps://helpdesk-yida.onrender.com/api/articles", {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const data = await res.json();
@@ -35,7 +35,7 @@ export default function KnowledgeBase() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await fetch("http://localhost:5000/api/articles", {
+      await fetch("https://helpdesk-yida.onrender.com/api/articles", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
