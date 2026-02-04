@@ -1,13 +1,34 @@
-import { useState } from "react";
-import { Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Clock, Loader } from "lucide-react";
+import { API_BASE_URL } from "../config";
 
 export default function ActivityLogs() {
-  const [logs] = useState([
-    { id: 101, user: "Super Admin", action: "System Update", details: "Updated security policies", time: "2 mins ago" },
-    { id: 102, user: "Admin User", action: "User Created", details: "Created account for Agent Sarah", time: "1 hour ago" },
-    { id: 103, user: "Agent Bob", action: "Login", details: "Successful login from IP 192.168.1.5", time: "3 hours ago" },
-    { id: 104, user: "Manager Sarah", action: "Report Generated", details: "Exported Monthly Ticket Report", time: "5 hours ago" },
-  ]);
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        // Real-time fetch from your local backend
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_BASE_URL}/api/logs`, {
+          headers: {
+            Authorization: `Bearer ${token}`, // Secure API call
+          },
+        });
+        const data = await response.json();
+        setLogs(data);
+      } catch (error) {
+        console.error("Error fetching logs:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user?.token) fetchLogs();
+  }, [user]);
+
+  if (loading) return <div className="flex justify-center p-10"><Loader className="animate-spin" /></div>;
 
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
@@ -21,12 +42,12 @@ export default function ActivityLogs() {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {logs.map((log) => (
-            <tr key={log.id} className="hover:bg-gray-50">
+          {logs.length > 0 ? logs.map((log) => (
+            <tr key={log._id} className="hover:bg-gray-50">
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex items-center gap-2">
-                <Clock size={14} /> {log.time}
+                <Clock size={14} /> {new Date(log.createdAt).toLocaleString()}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{log.user}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{log.userName}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                 <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-bold border border-gray-300">
                   {log.action}
@@ -34,7 +55,9 @@ export default function ActivityLogs() {
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.details}</td>
             </tr>
-          ))}
+          )) : (
+            <tr><td colSpan="4" className="text-center p-4 text-gray-500">No activity logs found.</td></tr>
+          )}
         </tbody>
       </table>
     </div>

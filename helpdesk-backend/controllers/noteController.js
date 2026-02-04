@@ -7,9 +7,15 @@ const getNotes = async (req, res) => {
   try {
     // 1. Ensure ticket exists (optional security check)
     const ticket = await Ticket.findById(req.params.ticketId);
-    
+
     // 2. Fetch notes
-    const notes = await Note.find({ ticket: req.params.ticketId });
+    // If Customer, HIDE internal notes
+    let query = { ticket: req.params.ticketId };
+    if (req.user.role === "Customer") {
+      query.isInternal = false;
+    }
+
+    const notes = await Note.find(query);
 
     res.status(200).json(notes);
   } catch (error) {
@@ -30,11 +36,15 @@ const addNote = async (req, res) => {
       throw new Error("User not authorized");
     }
 
+    const attachmentPath = req.file ? req.file.path : null;
+
     const note = await Note.create({
       text,
       isStaff: req.user.role !== "Customer", // Mark as staff reply if not customer
+      isInternal: req.body.isInternal === 'true' || req.body.isInternal === true, // Handle FormData string or JSON bool
       ticket: req.params.ticketId,
       user: req.user.id,
+      attachment: attachmentPath,
     });
 
     res.status(200).json(note);

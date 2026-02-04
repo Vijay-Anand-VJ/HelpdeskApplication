@@ -1,49 +1,72 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { UserPlus, Mail, Lock, User, LifeBuoy, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { UserPlus, Mail, Lock, User, ShieldCheck, Eye, EyeOff, Loader, AlertCircle, ArrowLeft } from "lucide-react";
 
 export default function Register() {
+  const { register } = useAuth();
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
-    role: "Customer",
   });
-  
-  const [showPassword, setShowPassword] = useState(false); // State for toggle
 
-  const handleSubmit = (e) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("New Customer Registration:", formData);
-    alert("Account created! Please log in.");
-    navigate("/");
+    setLoading(true);
+    setError("");
+
+    try {
+      await register(formData.name, formData.email, formData.password);
+      navigate("/tickets");
+    } catch (err) {
+      setError(err.message || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border-t-4 border-blue-600">
-        
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-600 mb-4">
-            <LifeBuoy size={24} />
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100 animate-fade-in-up relative">
+
+        {/* Back to Home Button */}
+        <Link to="/" className="absolute top-8 left-8 p-2 text-slate-400 hover:text-[#064e3b] hover:bg-emerald-50 rounded-lg transition-all" title="Back to Home">
+          <ArrowLeft size={20} />
+        </Link>
+
+        <div className="text-center mb-8 mt-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#064e3b] text-white mb-4 shadow-lg shadow-emerald-900/20">
+            <ShieldCheck size={28} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Join Support Portal</h1>
-          <p className="text-gray-500 text-sm mt-2">
-            Create a customer account to track your tickets and get help.
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Create Account</h1>
+          <p className="text-slate-500 text-sm mt-2 font-medium">
+            Join the internal support portal to manage tickets.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="mb-6 p-4 bg-rose-50 text-rose-700 text-sm rounded-xl flex items-center gap-3 border border-rose-100 font-bold">
+            <AlertCircle size={18} /> {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* Full Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Full Name</label>
             <div className="relative">
-              <User className="absolute left-3 top-3 text-gray-400" size={20} />
+              <User className="absolute left-3 top-3.5 text-slate-400" size={18} />
               <input
                 type="text"
                 required
-                className="w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#064e3b] focus:bg-white outline-none transition-all font-medium"
                 placeholder="Jane Doe"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -53,13 +76,13 @@ export default function Register() {
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3 text-gray-400" size={20} />
+              <Mail className="absolute left-3 top-3.5 text-slate-400" size={18} />
               <input
                 type="email"
                 required
-                className="w-full pl-10 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#064e3b] focus:bg-white outline-none transition-all font-medium"
                 placeholder="name@company.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -67,41 +90,42 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Password with Toggle */}
+          {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-3 text-gray-400" size={20} />
+              <Lock className="absolute left-3 top-3.5 text-slate-400" size={18} />
               <input
-                type={showPassword ? "text" : "password"} // Dynamic type
+                type={showPassword ? "text" : "password"}
                 required
-                className="w-full pl-10 pr-10 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" // increased pr-10
-                placeholder="Create a strong password"
+                className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#064e3b] focus:bg-white outline-none transition-all font-medium"
+                placeholder="••••••••"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
               <button
                 type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-[#064e3b] transition-colors"
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition shadow-sm flex justify-center items-center gap-2 mt-2"
+            disabled={loading}
+            className="w-full bg-[#064e3b] text-white py-3.5 rounded-xl font-bold hover:bg-[#043327] transition shadow-lg shadow-emerald-900/20 flex justify-center items-center gap-2 mt-2 active:scale-95 disabled:opacity-70"
           >
-            <UserPlus size={20} /> Create Account
+            {loading ? <Loader className="animate-spin" size={20} /> : <><UserPlus size={20} /> Create Account</>}
           </button>
         </form>
 
-        <div className="mt-8 text-center border-t border-gray-100 pt-6">
-          <p className="text-sm text-gray-600">
+        <div className="mt-8 text-center border-t border-slate-100 pt-6">
+          <p className="text-sm text-slate-500 font-medium">
             Already have an account?{" "}
-            <Link to="/" className="text-blue-600 font-bold hover:underline ml-1">
+            <Link to="/login" className="text-[#064e3b] font-bold hover:underline ml-1">
               Log in
             </Link>
           </p>

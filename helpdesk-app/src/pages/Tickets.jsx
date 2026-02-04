@@ -1,129 +1,229 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, Filter, AlertCircle, Loader } from "lucide-react";
+import { Plus, Search, Filter, AlertCircle, Loader, Ticket, X, Check } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { API_BASE_URL } from "../config";
 
 export default function Tickets() {
   const { user } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
 
-  // 1. FETCH TICKETS FROM BACKEND API
-  const fetchTickets = async () => {
+  // Create filters state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    status: [], // e.g. ['Open', 'In Progress']
+    priority: [] // e.g. ['High', 'Critical']
+  });
+
+  const API_URL = "http://localhost:5000/api/tickets";
+
+  const fetchTickets = useCallback(async () => {
+    if (!user?.token) return;
+
     try {
-      const response = await fetch("https://helpdesk-yida.onrender.com/api/tickets", {
-        headers: {
-          Authorization: `Bearer ${user.token}`, // Send the token!
-        },
+      const response = await fetch(API_URL, {
+        headers: { Authorization: `Bearer ${user.token}` },
       });
 
       const data = await response.json();
-
-      if (!response.ok) throw new Error(data.message);
+      if (!response.ok) throw new Error(data.message || "Failed to load tickets");
 
       setTickets(data);
-      setLoading(false);
     } catch (err) {
       setError(err.message);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [user?.token]);
 
   useEffect(() => {
     fetchTickets();
-  }, []);
+  }, [fetchTickets]);
 
-  // Filter Logic (Frontend side for now)
-  const filteredTickets = tickets.filter((ticket) =>
-    ticket.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- FILTERING LOGIC ---
+  const toggleFilter = (type, value) => {
+    setFilters(prev => {
+      const current = prev[type];
+      if (current.includes(value)) {
+        return { ...prev, [type]: current.filter(item => item !== value) };
+      } else {
+        return { ...prev, [type]: [...current, value] };
+      }
+    });
+  };
+
+  const clearFilters = () => {
+    setFilters({ status: [], priority: [] });
+    setSearchTerm("");
+  };
+
+  const filteredTickets = tickets.filter((ticket) => {
+    const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket._id.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = filters.status.length === 0 || filters.status.includes(ticket.status);
+    const matchesPriority = filters.priority.length === 0 || filters.priority.includes(ticket.priority);
+
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
+
+  if (!user) return null;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto animate-fade-in">
-      
+    <div className="p-6 max-w-7xl mx-auto animate-fade-in pb-20">
+
       {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Tickets</h1>
-          <p className="text-gray-500">Manage and track your support requests</p>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Support Tickets</h1>
+          <p className="text-slate-500 font-medium">Manage and track your active support requests</p>
         </div>
-        <div className="flex gap-2">
-          
-          <Link to="/tickets/new" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg shadow-blue-200">
-            <Plus size={20} /> New Ticket
-          </Link>
-        </div>
+        <Link to="/tickets/new" className="bg-[#064e3b] hover:bg-[#043327] text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20 font-bold active:scale-95">
+          <Plus size={20} /> New Ticket
+        </Link>
       </div>
 
-      {/* SEARCH BAR */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row gap-4">
+      {/* SEARCH & FILTERS BAR */}
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row gap-4 relative z-20">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+          <Search className="absolute left-3 top-3.5 text-slate-400" size={18} />
           <input
             type="text"
-            placeholder="Search tickets..."
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            placeholder="Search by subject or ID..."
+            className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#064e3b] focus:bg-white outline-none transition-all placeholder:font-medium"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium">
-          <Filter size={20} /> Filter
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center justify-center gap-2 px-6 py-3 border rounded-xl font-bold transition-colors ${showFilters || filters.status.length > 0 || filters.priority.length > 0
+            ? 'bg-emerald-50 border-emerald-200 text-[#064e3b]'
+            : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+            }`}
+        >
+          <Filter size={18} /> Filters {(filters.status.length + filters.priority.length) > 0 && `(${filters.status.length + filters.priority.length})`}
         </button>
       </div>
 
-      {/* ERROR MESSAGE */}
+      {/* EXPANDABLE FILTER PANEL */}
+      {showFilters && (
+        <div className="bg-white p-6 rounded-2xl shadow-xl border border-slate-100 mb-8 animate-fade-in z-10 relative">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-slate-800">Filter Options</h3>
+            <button onClick={clearFilters} className="text-xs font-bold text-rose-500 hover:text-rose-600 hover:underline">Clear All</button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* STATUS */}
+            <div>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Status</label>
+              <div className="flex flex-wrap gap-2">
+                {['Open', 'In Progress', 'Resolved', 'Closed'].map(status => (
+                  <button
+                    key={status}
+                    onClick={() => toggleFilter('status', status)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-2 ${filters.status.includes(status)
+                      ? 'bg-[#064e3b] text-white border-[#064e3b]'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'
+                      }`}
+                  >
+                    {filters.status.includes(status) && <Check size={12} />} {status}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* PRIORITY */}
+            <div>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Priority</label>
+              <div className="flex flex-wrap gap-2">
+                {['Low', 'Medium', 'High', 'Critical'].map(priority => (
+                  <button
+                    key={priority}
+                    onClick={() => toggleFilter('priority', priority)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-2 ${filters.priority.includes(priority)
+                      ? 'bg-[#064e3b] text-white border-[#064e3b]'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'
+                      }`}
+                  >
+                    {filters.priority.includes(priority) && <Check size={12} />} {priority}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
-        <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-lg flex items-center gap-2 border border-red-100">
+        <div className="mb-8 p-4 bg-rose-50 text-rose-700 rounded-xl flex items-center gap-3 border border-rose-100 font-medium">
           <AlertCircle size={20} /> Error: {error}
         </div>
       )}
 
-      {/* LOADING SPINNER */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader className="animate-spin text-blue-600" size={40} />
+        <div className="flex flex-col items-center justify-center py-32 gap-4">
+          <Loader className="animate-spin text-[#064e3b]" size={40} />
+          <p className="text-slate-400 font-bold animate-pulse">Syncing with server...</p>
         </div>
       ) : (
-        /* TICKET LIST */
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-50 overflow-hidden">
           {filteredTickets.length > 0 ? (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-slate-50">
               {filteredTickets.map((ticket) => (
-                <Link to={`/tickets/${ticket._id}`} key={ticket._id} className="block p-5 hover:bg-gray-50 transition-colors group">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="font-bold text-gray-800 group-hover:text-blue-600 transition-colors mb-1">{ticket.title}</h3>
-                      <p className="text-sm text-gray-500 line-clamp-1">{ticket.description}</p>
-                      <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${
-                          ticket.priority === 'High' ? 'bg-red-100 text-red-600' : 
-                          ticket.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-600'
-                        }`}>
+                <Link to={`/tickets/${ticket._id}`} key={ticket._id} className="block p-6 hover:bg-slate-50/50 transition-all group">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${ticket.priority === 'Critical' ? 'bg-rose-100 text-rose-600' :
+                          ticket.priority === 'High' ? 'bg-orange-100 text-orange-600' :
+                            ticket.priority === 'Medium' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
+                          }`}>
                           {ticket.priority}
                         </span>
-                        <span>• {ticket.category}</span>
-                        <span>• {new Date(ticket.createdAt).toLocaleDateString()}</span>
+                        <span className="text-slate-300 text-xs font-mono font-bold">#{ticket._id.slice(-4)}</span>
                       </div>
+                      <h3 className="text-lg font-bold text-slate-800 group-hover:text-[#064e3b] transition-colors mb-1 flex items-center gap-2">
+                        {ticket.title}
+                        {new Date(ticket.dueDate) < new Date() && ticket.status !== 'Closed' && ticket.status !== 'Resolved' && (
+                          <span className="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-md uppercase font-black tracking-wider shadow-sm shadow-rose-200">
+                            SLA Breached
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-sm text-slate-500 line-clamp-1 max-w-2xl">{ticket.description}</p>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      ticket.status === 'Open' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                    }`}>
-                      {ticket.status}
+
+                    <div className="flex items-center justify-between md:justify-end gap-6">
+                      <div className="text-right hidden md:block">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter mb-1">{ticket.category}</p>
+                        <p className="text-[11px] text-slate-400">{new Date(ticket.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className={`px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border ${ticket.status === 'Open' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                        ticket.status === 'Resolved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                          ticket.status === 'Closed' ? 'bg-slate-100 text-slate-500 border-slate-200' :
+                            'bg-amber-50 text-amber-700 border-amber-100'
+                        }`}>
+                        {ticket.status}
+                      </div>
                     </div>
                   </div>
                 </Link>
               ))}
             </div>
           ) : (
-            <div className="text-center py-16">
-              <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Filter className="text-gray-400" size={24} />
+            <div className="text-center py-24 px-6">
+              <div className="bg-slate-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner">
+                <Ticket className="text-slate-300" size={32} />
               </div>
-              <h3 className="text-lg font-medium text-gray-900">No tickets found</h3>
-              <p className="text-gray-500 mt-1">Get started by creating a new ticket.</p>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">No tickets found</h3>
+              <p className="text-slate-500 max-w-xs mx-auto">
+                We couldn't find any tickets matching your current filters or search.
+              </p>
             </div>
           )}
         </div>

@@ -1,42 +1,64 @@
-const User = require("../models/user"); // Ensure this matches your file name (User.js)
+const User = require("../models/user");
+const Log = require("../models/Log"); // Import Log Model
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const crypto = require("crypto"); // <--- NEW: For generating reset tokens
-const sendEmail = require("../utils/sendEmail"); // <--- NEW: For sending emails
+const crypto = require("crypto");
+const sendEmail = require("../utils/sendEmail");
+// Removed: const generateToken = require("../utils/generateToken"); // generateToken is now defined locally
 
-// Generate JWT Token
+/**
+ * @desc    Generate a JSON Web Token (JWT)
+ * @param   {string} id - The user ID to embed in the token
+ * @returns {string} - Signed JWT token valid for 30 days
+ */
 const generateToken = (id) => {
+  // Sign the JWT with the user ID and a secret, setting an expiration
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "30d",
   });
 };
 
-// @desc    Register a new user
-// @route   POST /api/auth/register
+
+/**
+ * @desc    Register a new user
+ * @route   POST /api/auth/register
+ * @access  Public
+ */
 const registerUser = async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password } = req.body; // Removed 'role' from destructuring as it's forced to 'Customer'
+
+  // 1. Validation: Ensure all required fields are present
+  if (!name || !email || !password) {
+    return res.status(400).json({ message: "Please include all fields" });
+  }
 
   try {
+    // 2. Check for Duplicates: Ensure email is unique
     const userExists = await User.findOne({ email });
 
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
     }
 
+    // 3. Create User: Password hashing is handled by the Mongoose 'pre-save' middleware in the User model
     const user = await User.create({
       name,
       email,
       password,
-      role: role || "Customer",
+      role: "Customer", // FORCE role to Customer. Admin can change it later manually.
     });
 
+    // 4. Response: Return user details and a JWT token upon successful registration
     if (user) {
+      // Log Registration
+      await Log.create({ user: user._id, action: "REGISTER", details: `New user registered: ${email}` });
+
       res.status(201).json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
-        token: generateToken(user._id),
+        token: generateToken(user._id), // Generate JWT for the new user
       });
     } else {
       res.status(400).json({ message: "Invalid user data" });
@@ -46,21 +68,30 @@ const registerUser = async (req, res) => {
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
+/**
+ * @desc    Authenticate a user & get token
+ * @route   POST /api/auth/login
+ * @access  Public
+ */
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    // 1. Find User by Email
     const user = await User.findOne({ email });
 
+    // 2. Verify Password: Compare plaintext input with hashed DB password using the User model's method
     if (user && (await user.matchPassword(password))) {
+      // Log Login
+      await Log.create({ user: user._id, action: "LOGIN", details: "User logged in successfully" });
+
+      // 3. Success Response: Return user details and a JWT token
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
-        token: generateToken(user._id),
+        token: generateToken(user._id), // Generate JWT for the authenticated user
       });
     } else {
       res.status(401).json({ message: "Invalid email or password" });
@@ -70,49 +101,8 @@ const loginUser = async (req, res) => {
   }
 };
 
-// @desc    Get all users (Admin only)
-// @route   GET /api/users
-const getUsers = async (req, res) => {
-  try {
-    const users = await User.find({}).select("-password"); // Don't send passwords back!
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 
-// @desc    Create a user (Admin only)
-// @route   POST /api/users
-const createUser = async (req, res) => {
-  const { name, email, password, role, department } = req.body;
 
-  try {
-    const userExists = await User.findOne({ email });
-    if (userExists) return res.status(400).json({ message: "User already exists" });
-
-    // Admin can set the role directly
-    const user = await User.create({
-      name,
-      email,
-      password,
-      role, 
-      department
-    });
-
-    if (user) {
-      res.status(201).json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      });
-    } else {
-      res.status(400).json({ message: "Invalid user data" });
-    }
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
 
 // @desc    Forgot Password (Send Email)
 // @route   POST /api/auth/forgot-password
@@ -167,7 +157,7 @@ const forgotPassword = async (req, res) => {
 // @route   PUT /api/auth/reset-password/:resetToken
 const resetPassword = async (req, res) => {
   const { password } = req.body;
-  
+
   // Hash the token sent in the URL to compare with DB
   const resetPasswordToken = crypto
     .createHash("sha256")
@@ -197,11 +187,21 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { 
-  registerUser, 
-  loginUser, 
-  getUsers, 
-  createUser, 
-  forgotPassword, 
-  resetPassword 
+// @desc    Get all activity logs (Admin only)
+// @route   GET /api/auth/logs
+const getLogs = async (req, res) => {
+  try {
+    const logs = await Log.find({}).populate("user", "name email").sort({ createdAt: -1 });
+    res.json(logs);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  registerUser,
+  loginUser,
+  forgotPassword,
+  resetPassword,
+  getLogs
 };

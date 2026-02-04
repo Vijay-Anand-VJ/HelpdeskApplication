@@ -1,4 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Outfit', sans-serif; 
+    @apply bg-[#f4f7f5] text-[#09090b];
+  }
+}
+
+@layer components {
+  /* Midnight Emerald Hub Cards */
+  .hub-card {
+    @apply bg-white border border-emerald-100/50 shadow-[0_20px_50px_rgba(16,185,129,0.05)] rounded-[2.5rem] p-8;
+  }
+
+  /* Emerald Cyber Buttons */
+  .btn-cyber {
+    @apply bg-[#059669] hover:bg-[#047857] text-white font-bold py-3.5 px-8 rounded-full 
+           transition-all duration-300 shadow-xl shadow-emerald-100 active:scale-95 flex items-center gap-2;
+  }
+}

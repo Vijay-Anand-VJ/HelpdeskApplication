@@ -1,10 +1,25 @@
 const Article = require("../models/Article");
 
-// @desc    Get all articles
-// @route   GET /api/articles
+// @desc    Get all articles (with search & filter)
+// @route   GET /api/articles?search=...&category=...
 const getArticles = async (req, res) => {
   try {
-    const articles = await Article.find({});
+    const { search, category } = req.query;
+    let query = {};
+
+    if (search) {
+      // Search in Title or Content
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { content: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (category) {
+      query.category = category;
+    }
+
+    const articles = await Article.find(query);
     res.json(articles);
   } catch (error) {
     res.status(500).json({ message: error.message });

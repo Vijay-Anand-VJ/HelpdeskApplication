@@ -1,79 +1,66 @@
 import { createContext, useState, useContext, useEffect } from "react";
+import { API_BASE_URL } from "../config";
 
 const AuthContext = createContext();
+const API_URL = `${API_BASE_URL}/api/auth`;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. Check if user is already logged in (on page load)
   useEffect(() => {
-    const storedUser = localStorage.getItem("userInfo");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    try {
+      const storedUser = localStorage.getItem("userInfo");
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error("Session restoration failed", error);
+      localStorage.removeItem("userInfo");
+    } finally {
+      // PRD Requirement: Ensure app renders after session check [cite: 38]
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  // 2. LOGIN FUNCTION (Calls Backend API)
   const login = async (email, password) => {
     try {
-      const response = await fetch("https://helpdesk-yida.onrender.com/api/auth/login", {
+      const response = await fetch(`${API_URL}/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Login failed");
 
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
-      }
+      // Normalizing data structure for Module 1 [cite: 33, 41]
+      const userToStore = data.user ? { ...data.user, token: data.token } : data;
 
-      // Success! Save user data
-      setUser(data);
-      localStorage.setItem("userInfo", JSON.stringify(data));
-      return data; // Return data so the Login page knows the Role
+      setUser(userToStore);
+      localStorage.setItem("userInfo", JSON.stringify(userToStore));
+      return userToStore;
     } catch (error) {
-      console.error("Login Error:", error);
-      throw error; // Pass error back to Login page to show alert
-    }
-  };
-
-  // 3. LOGOUT FUNCTION
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("userInfo");
-    // Optional: Redirect to login page logic handles automatically if user is null
-  };
-
-  // 4. REGISTER FUNCTION (For Module 11)
-  const register = async (name, email, password) => {
-    try {
-      const response = await fetch("https://helpdesk-yida.onrender.com/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message);
-      
-      // Auto-login after register
-      setUser(data);
-      localStorage.setItem("userInfo", JSON.stringify(data));
-    } catch (error) {
+      console.error("Login Fetch Error:", error);
       throw error;
     }
   };
 
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("userInfo");
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, register, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+// This NAMED EXPORT fixes the "Requested module does not provide an export" error
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
+  return context;
+};

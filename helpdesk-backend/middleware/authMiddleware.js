@@ -15,15 +15,29 @@ const protect = async (req, res, next) => {
       // Get user from token ID (exclude password)
       req.user = await User.findById(decoded.id).select("-password");
 
+      // Check if user exists
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authorized, user not found" });
+      }
+
       next(); // Move to the next step
     } catch (error) {
-      res.status(401).json({ message: "Not authorized, token failed" });
+      console.error(error);
+      return res.status(401).json({ message: "Not authorized, token failed" });
     }
   }
 
   if (!token) {
-    res.status(401).json({ message: "Not authorized, no token" });
+    return res.status(401).json({ message: "Not authorized, no token" });
   }
 };
 
-module.exports = { protect };
+const admin = (req, res, next) => {
+  if (req.user && ["Admin", "Super Admin", "Manager"].includes(req.user.role)) {
+    next();
+  } else {
+    res.status(401).json({ message: "Not authorized as an admin" });
+  }
+};
+
+module.exports = { protect, admin };

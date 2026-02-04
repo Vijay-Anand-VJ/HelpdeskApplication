@@ -1,96 +1,108 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Save, ArrowLeft, Loader, AlertCircle, Paperclip } from "lucide-react";
+import { Send, AlertCircle, FileText, Tag, Paperclip, Loader } from "lucide-react";
+import { API_BASE_URL } from "../config";
+
+// Configuration
+const PRIORITIES = ["Low", "Medium", "High", "Critical"];
+const CATEGORIES = ["Technical", "Hardware", "Software", "Access", "General", "HR", "Finance"];
 
 export default function NewTicket() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Technical");
-  const [priority, setPriority] = useState("Medium");
-  const [attachment, setAttachment] = useState(null); // State for the file
-
+  // Form State
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    priority: "Medium",
+    category: "Technical",
+  });
+  const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
+
+  const API_URL = `${API_BASE_URL}/api/tickets`;
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    if (!user?.token) return; // Safety Guard
+
     setLoading(true);
     setError(null);
 
-    // 1. Create FormData object (Required for sending files)
     const formData = new FormData();
     formData.append("title", title);
     formData.append("description", description);
     formData.append("category", category);
     formData.append("priority", priority);
     if (attachment) {
-      formData.append("attachment", attachment); // Append the file
+      formData.append("attachment", attachment);
     }
 
     try {
-      const response = await fetch("https://helpdesk-yida.onrender.com/api/tickets", {
+      const response = await fetch(API_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${user.token}`,
-          // NOTE: Do NOT set Content-Type here. Browser sets it to multipart/form-data automatically.
+          // Browser sets multipart/form-data boundary automatically
         },
-        body: formData, // Send the FormData object
+        body: formData,
       });
 
       const data = await response.json();
-
-      if (!response.ok) throw new Error(data.message);
+      if (!response.ok) throw new Error(data.message || "Failed to create ticket");
 
       navigate("/tickets");
     } catch (err) {
       setError(err.message);
+    } finally {
       setLoading(false);
     }
   };
 
+  // Prevent rendering if user is null
+  if (!user) return null;
+
   return (
     <div className="max-w-2xl mx-auto p-6 animate-fade-in-up">
-      <button onClick={() => navigate(-1)} className="flex items-center text-gray-500 hover:text-gray-800 mb-6 transition">
+      <button onClick={() => navigate(-1)} className="flex items-center text-slate-500 hover:text-slate-800 mb-6 transition font-medium">
         <ArrowLeft size={20} className="mr-1" /> Back
       </button>
 
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">Create New Ticket</h1>
-        <p className="text-gray-500 mb-6">Please describe your issue in detail</p>
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900">Create New Ticket</h1>
+          <p className="text-slate-500">Describe your issue and we'll get right on it.</p>
+        </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg flex items-center gap-2 border border-red-100">
+          <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-xl flex items-center gap-3 border border-red-100">
             <AlertCircle size={18} /> {error}
           </div>
         )}
 
         <form onSubmit={onSubmit} className="space-y-6">
-          
-          {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Subject / Title</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Subject / Title</label>
             <input
               type="text"
+              required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
               placeholder="e.g. VPN Connection Failed"
-              required
             />
           </div>
 
-          {/* Category & Priority */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Category</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-3 bg-white"
+                className="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Technical">Technical Issue</option>
                 <option value="Hardware">Hardware / Equipment</option>
@@ -101,11 +113,11 @@ export default function NewTicket() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Priority</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-3 bg-white"
+                className="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="Low">Low - Not Urgent</option>
                 <option value="Medium">Medium - Standard</option>
@@ -115,54 +127,40 @@ export default function NewTicket() {
             </div>
           </div>
 
-          {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
             <textarea
+              required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg p-3 h-32"
-              placeholder="Describe what happened..."
-              required
+              className="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 h-40 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all resize-none"
+              placeholder="Provide as much detail as possible..."
             ></textarea>
           </div>
 
-          {/* FILE UPLOAD INPUT */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Attachment (Optional)</label>
-            <div className="flex items-center justify-center w-full">
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Attachment (Optional)</label>
+            <div className="relative">
+              <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${attachment ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'}`}>
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <Paperclip className="w-8 h-8 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-500">
-                    {attachment ? (
-                      <span className="font-bold text-blue-600">{attachment.name}</span>
-                    ) : (
-                      <>
-                        <span className="font-semibold">Click to upload</span> or drag and drop
-                      </>
-                    )}
+                  <Paperclip className={`w-8 h-8 mb-2 ${attachment ? 'text-blue-600' : 'text-slate-400'}`} />
+                  <p className="text-sm text-slate-600">
+                    {attachment ? <span className="font-bold">{attachment.name}</span> : <span>Click to upload or drag and drop</span>}
                   </p>
-                  <p className="text-xs text-gray-500">SVG, PNG, JPG or PDF (MAX. 5MB)</p>
+                  <p className="text-xs text-slate-400 mt-1">SVG, PNG, JPG or PDF (MAX. 5MB)</p>
                 </div>
-                <input 
-                  type="file" 
-                  className="hidden" 
-                  onChange={(e) => setAttachment(e.target.files[0])} 
-                />
+                <input type="file" className="hidden" onChange={(e) => setAttachment(e.target.files[0])} />
               </label>
             </div>
           </div>
 
-          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition flex justify-center items-center gap-2"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-blue-100 flex justify-center items-center gap-2 active:scale-95 disabled:opacity-70"
           >
             {loading ? <Loader className="animate-spin" size={20} /> : <><Save size={20} /> Submit Ticket</>}
           </button>
-
         </form>
       </div>
     </div>

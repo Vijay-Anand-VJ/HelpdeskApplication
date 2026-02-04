@@ -12,6 +12,9 @@ const noteSchema = mongoose.Schema(
       required: true,
       ref: "Ticket",
     },
+    attachment: {
+      type: String, // URL/Path to file
+    },
     text: {
       type: String,
       required: true,
@@ -22,6 +25,10 @@ const noteSchema = mongoose.Schema(
     },
     staffId: {
       type: String,
+    },
+    isInternal: {
+      type: Boolean,
+      default: false, // true = Hidden from Customer
     },
   },
   { timestamps: true }

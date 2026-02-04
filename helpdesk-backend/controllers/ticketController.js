@@ -1,17 +1,18 @@
 const Ticket = require("../models/Ticket");
-const User = require("../models/user"); // Fixed duplicate import
+const User = require("../models/user");
+const Notification = require("../models/Notification");
 const sendEmail = require("../utils/sendEmail");
 
 // @desc    Get user tickets
 // @route   GET /api/tickets
 const getTickets = async (req, res) => {
   try {
-    // If Admin/Agent, fetch ALL tickets. If Customer, fetch ONLY theirs.
     let tickets;
+    // Role-based scoping: Customers see only their own, Staff see all
     if (req.user.role === "Customer") {
-      tickets = await Ticket.find({ user: req.user.id });
+      tickets = await Ticket.find({ user: req.user._id }).sort({ createdAt: -1 });
     } else {
-      tickets = await Ticket.find(); // Admins see everything
+      tickets = await Ticket.find().sort({ createdAt: -1 });
     }
     res.status(200).json(tickets);
   } catch (error) {
@@ -30,48 +31,44 @@ const createTicket = async (req, res) => {
 
   try {
     // 1. Calculate Due Date (SLA Logic)
-    let dueDate = new Date(); // Start with "Right Now"
-    
-    if (priority === "Low") {
-      dueDate.setHours(dueDate.getHours() + 48); // +2 Days
-    } else if (priority === "Medium") {
-      dueDate.setHours(dueDate.getHours() + 24); // +1 Day
-    } else if (priority === "High") {
-      dueDate.setHours(dueDate.getHours() + 4);  // +4 Hours
-    } else if (priority === "Critical") {
-      dueDate.setHours(dueDate.getHours() + 1);  // +1 Hour
-    }
+    let dueDate = new Date();
+    if (priority === "Low") dueDate.setHours(dueDate.getHours() + 48);
+    else if (priority === "Medium") dueDate.setHours(dueDate.getHours() + 24);
+    else if (priority === "High") dueDate.setHours(dueDate.getHours() + 4);
+    else if (priority === "Critical") dueDate.setHours(dueDate.getHours() + 1);
 
-    // 2. Handle File Upload (if exists)
     const attachmentPath = req.file ? req.file.path : null;
 
-    // 3. Create Ticket
+    // 2. Create Ticket in Database
     const ticket = await Ticket.create({
       title,
       description,
       category,
       priority,
-      user: req.user.id,
+      user: req.user._id,
       status: "Open",
       attachment: attachmentPath,
-      dueDate: dueDate, // <--- Save the calculated deadline
+      dueDate: dueDate,
     });
 
-    // --- NEW: SEND EMAIL NOTIFICATION ---
+    // 3. TRIGGER: In-App Notification
+    await Notification.create({
+      user: req.user.id,
+      message: `Your ticket "${ticket.title}" has been successfully created.`,
+      type: "success"
+    });
+
+    // 4. TRIGGER: Email Notification
     try {
-      // Fetch user details to get the email address
-      const user = await User.findById(req.user.id);
-      
+      const userDetails = await User.findById(req.user.id);
       await sendEmail({
-        email: user.email,
-        subject: `Ticket Created: #${ticket._id}`,
-        message: `Hello ${user.name},\n\nYour ticket "${ticket.title}" has been created successfully.\n\nPriority: ${ticket.priority}\nDue Date: ${dueDate}\n\nTrack status on your dashboard.`,
+        email: userDetails.email,
+        subject: `Ticket Created: #${ticket._id.toString().slice(-6)}`,
+        message: `Hello ${userDetails.name},\n\nYour ticket "${ticket.title}" is now open.\nPriority: ${priority}\nDue Date: ${dueDate}`,
       });
     } catch (emailError) {
-      console.error("Email could not be sent:", emailError.message);
-      // Don't crash the app if email fails, just log it
+      console.error("Email failed to send:", emailError.message);
     }
-    // ------------------------------------
 
     res.status(201).json(ticket);
   } catch (error) {
@@ -90,7 +87,8 @@ const getTicketById = async (req, res) => {
     }
 
     // Security: Only allow owner or staff to view
-    if (ticket.user.toString() !== req.user.id && req.user.role === "Customer") {
+    const isStaff = ["Admin", "Agent", "Manager", "Super Admin"].includes(req.user.role);
+    if (ticket.user.toString() !== req.user._id.toString() && !isStaff) {
       return res.status(401).json({ message: "Not authorized" });
     }
 
@@ -100,7 +98,7 @@ const getTicketById = async (req, res) => {
   }
 };
 
-// @desc    Update ticket
+// @desc    Update ticket (Including Assignment)
 // @route   PUT /api/tickets/:id
 const updateTicket = async (req, res) => {
   try {
@@ -110,37 +108,93 @@ const updateTicket = async (req, res) => {
       return res.status(404).json({ message: "Ticket not found" });
     }
 
-    // Limit who can update
-    if (ticket.user.toString() !== req.user.id && req.user.role === "Customer") {
-      return res.status(401).json({ message: "Not authorized" });
+    // Role-based Security check
+    const isStaff = ["Admin", "Agent", "Manager", "Super Admin"].includes(req.user.role);
+    const canAssign = ["Admin", "Manager", "Super Admin"].includes(req.user.role);
+    const isOwner = ticket.user.toString() === req.user._id.toString();
+
+    if (!isOwner && !isStaff) {
+      return res.status(401).json({ message: "Not authorized to update this ticket" });
     }
+
+    const oldStatus = ticket.status;
+    const oldAssignee = ticket.assignedTo ? ticket.assignedTo.toString() : null;
+
+    // Prevent Mass Assignment: Filter fields based on role
+    const updates = {};
+    const allowedFields = ["title", "description", "status", "category", "priority"];
+
+    // Only Admin/Manager can assign
+    if (canAssign && req.body.assignedTo) {
+      updates.assignedTo = req.body.assignedTo;
+    }
+
+    // Only allow specific fields to be updated
+    Object.keys(req.body).forEach(key => {
+      if (allowedFields.includes(key)) {
+        updates[key] = req.body[key];
+      }
+    });
 
     const updatedTicket = await Ticket.findByIdAndUpdate(
       req.params.id,
-      req.body,
-      { new: true } // Return the new updated version
-    );
+      updates, // Use filtered updates
+      { new: true, runValidators: true }
+    ).populate('assignedTo', 'name email'); // Populate to get agent details
+
+    // --- TRIGGER: Notification for Status Change ---
+    if (oldStatus !== updatedTicket.status) {
+      await Notification.create({
+        user: updatedTicket.user,
+        message: `Ticket #${updatedTicket._id.toString().slice(-6)} status changed to ${updatedTicket.status}`,
+        type: "info"
+      });
+    }
+
+    // --- TRIGGER: Notification for New Assignment ---
+    if (req.body.assignedTo && oldAssignee !== req.body.assignedTo) {
+      if (updatedTicket.assignedTo) {
+        await Notification.create({
+          user: updatedTicket.assignedTo._id || updatedTicket.assignedTo, // Handle populated vs unpopulated
+          message: `A new ticket has been assigned to you: #${updatedTicket._id.toString().slice(-6)}`,
+          type: "success"
+        });
+      }
+    }
 
     res.status(200).json(updatedTicket);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-
 // @desc    Get Ticket Statistics for Reports
 // @route   GET /api/tickets/stats
+/**
+ * @desc    Get Ticket Statistics for Reports
+ * @route   GET /api/tickets/stats
+ * @access  Private (Staff)
+ * 
+ * Aggregates data for the Dashboard and Reports module.
+ * Returns:
+ * - Status Breakdown (Open, Closed, etc.)
+ * - Priority Breakdown (Critical, High, etc.)
+ * - SLA Breach Count
+ * - Agent Leaderboard
+ */
 const getTicketStats = async (req, res) => {
   try {
-    const tickets = await Ticket.find({});
+    // Populate assignedTo to get agent names for the leaderboard
+    const tickets = await Ticket.find({}).populate("assignedTo", "name");
 
-    // 1. Status Counts
+    // 1. Calculate Status Counts
     const statusData = {
       open: tickets.filter((t) => t.status === "Open").length,
       inProgress: tickets.filter((t) => t.status === "In Progress").length,
       closed: tickets.filter((t) => t.status === "Closed").length,
+      resolved: tickets.filter((t) => t.status === "Resolved").length,
     };
 
-    // 2. Priority Counts (For Pie Chart)
+    // 2. Calculate Priority Counts
     const priorityData = {
       low: tickets.filter((t) => t.priority === "Low").length,
       medium: tickets.filter((t) => t.priority === "Medium").length,
@@ -148,17 +202,48 @@ const getTicketStats = async (req, res) => {
       critical: tickets.filter((t) => t.priority === "Critical").length,
     };
 
-    // 3. Category Counts (For Bar Chart)
+    // 3. Calculate Category Distribution
     const categoryData = tickets.reduce((acc, ticket) => {
       acc[ticket.category] = (acc[ticket.category] || 0) + 1;
       return acc;
     }, {});
 
+    // 4. SLA Breach Count
+    const breachCount = tickets.filter(t => t.isBreached).length;
+
+    // 5. Agent Performance Leaderboard
+    // Group by Agent ID -> { name, resolved, open, total }
+    const agentMap = {};
+
+    tickets.forEach(ticket => {
+      // Only count if assigned to a valid agent
+      if (ticket.assignedTo && ticket.assignedTo._id) {
+        const agentId = ticket.assignedTo._id.toString();
+        const agentName = ticket.assignedTo.name || "Unknown Agent";
+
+        if (!agentMap[agentId]) {
+          agentMap[agentId] = { name: agentName, resolved: 0, open: 0, total: 0 };
+        }
+
+        agentMap[agentId].total += 1;
+
+        if (ticket.status === "Resolved" || ticket.status === "Closed") {
+          agentMap[agentId].resolved += 1;
+        } else {
+          agentMap[agentId].open += 1;
+        }
+      }
+    });
+
+    const agentPerformance = Object.values(agentMap);
+
     res.json({
       total: tickets.length,
       status: statusData,
       priority: priorityData,
-      category: categoryData
+      category: categoryData,
+      slaBreaches: breachCount,
+      agentPerformance: agentPerformance
     });
 
   } catch (error) {
@@ -166,10 +251,10 @@ const getTicketStats = async (req, res) => {
   }
 };
 
-module.exports = { 
-  getTickets, 
-  createTicket, 
-  getTicketById, 
-  updateTicket, 
-  getTicketStats 
+module.exports = {
+  getTickets,
+  createTicket,
+  getTicketById,
+  updateTicket,
+  getTicketStats
 };
