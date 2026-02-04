@@ -105,3 +105,23 @@ Before deploying, you must push your code to GitHub.
 2.  Try to **Register** a new user (this tests DB connection).
 3.  Login and perform an action.
 4.  **Note:** If the backend is "asleep", the login might timeout the first time. Try again after 1 minute.
+
+---
+
+## 📚 Appendix: How to get MongoDB Connection String
+
+1.  **Log in** to [MongoDB Atlas](https://cloud.mongodb.com).
+2.  **Network Access (Important):**
+    *   Click **Network Access** in the left sidebar.
+    *   Click **Add IP Address** -> Select **"Allow Access from Anywhere"** (0.0.0.0/0).
+    *   *Reason:* Render's IP changes, so we need open access (protected by your strong password).
+3.  **Database Access:**
+    *   Click **Database Access**.
+    *   Create a database user (e.g., `admin`) and set a **Password**.
+    *   **Remember this password!**
+4.  **Get String:**
+    *   Click **Database** (left sidebar) -> **Connect** (button on your cluster).
+    *   Select **Drivers** (Node.js).
+    *   **Copy connection string**. It looks like:
+        `mongodb+srv://admin:<password>@cluster0.mongodb.net/?retryWrites=true&w=majority`
+    *   **Replace `<password>`** with the actual password you created in step 3.

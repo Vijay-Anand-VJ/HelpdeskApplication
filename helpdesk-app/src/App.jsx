@@ -5,7 +5,7 @@ import RequireRole from "./components/auth/RequireRole";
 // PAGES
 import Landing from "./pages/Landing"; // <--- 1. Import Landing
 import Login from "./pages/Login";
-import Register from "./pages/Register";
+import Register from "./pages/register";
 import ForgotPassword from "./pages/forgotpassword";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./pages/Dashboard";
