@@ -17,7 +17,7 @@ export default function KnowledgeBase() {
   // Form State
   const [formData, setFormData] = useState({ title: "", category: "General", content: "" });
 
-  const API_URL = "http://localhost:5000/api/articles";
+
 
   // 1. Fetch Articles - Wrapped in useCallback for dependency safety
   const fetchArticles = useCallback(async () => {
