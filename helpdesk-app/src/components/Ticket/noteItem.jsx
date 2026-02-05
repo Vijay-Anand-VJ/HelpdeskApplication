@@ -79,3 +79,5 @@ const NoteItem = ({ note, currentUser }) => {
     </div>
   );
 }
+
+export default NoteItem;
