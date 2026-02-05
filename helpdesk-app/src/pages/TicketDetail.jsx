@@ -276,7 +276,7 @@ export default function TicketDetail() {
           </div>
         ) : (
           notes.map((note) => (
-            <NoteItem key={note._id} note={note} />
+            <NoteItem key={note._id} note={note} currentUser={user} />
           ))
         )}
       </div>
