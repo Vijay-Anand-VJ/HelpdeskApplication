@@ -45,16 +45,15 @@ const userSchema = mongoose.Schema(
  *        Runs automatically before 'save'.
  *        Hashes the password using bcryptjs if it has been modified.
  */
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
   // If password is not modified (e.g. only updating name), skip hashing
   if (!this.isModified('password')) {
-    return next();
+    return;
   }
 
   // Generate salt and hash
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 /**
